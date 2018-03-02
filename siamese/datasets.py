@@ -42,7 +42,7 @@ def omniglot_enum_images(root_dir_path, category):
     """
     image_paths = omniglot_enum_image_paths(root_dir_path, category)
 
-    alphabet_indices = {}
+    alphabet_names = []
     character_number = {}
 
     # NOTE: give alphabets indices
@@ -51,12 +51,18 @@ def omniglot_enum_images(root_dir_path, category):
         _, alphabet_key, character_idx, drawer_idx = \
             omniglot_path_to_keys(image_path)
 
-        if alphabet_key not in alphabet_indices:
-            alphabet_indices[alphabet_key] = len(alphabet_indices)
+        if alphabet_key not in character_number:
             character_number[alphabet_key] = character_idx + 1
+
+            alphabet_names.append(alphabet_key)
 
         if character_number[alphabet_key] <= character_idx:
             character_number[alphabet_key] = character_idx + 1
+
+    # NOTE: sort names so that the structure of omniglot is consistant.
+    alphabet_names = sorted(alphabet_names)
+
+    alphabet_indices = {n: i for i, n in enumerate(alphabet_names)}
 
     # NOTE: we have len(alphabet_indices) alphabets
     omniglot = [[]] * len(alphabet_indices)

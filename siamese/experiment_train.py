@@ -102,6 +102,5 @@ def main(_):
 if __name__ == '__main__':
     tf.app.flags.DEFINE_string('data_path', None, '')
     tf.app.flags.DEFINE_string('ckpt_path', None, '')
-    tf.app.flags.DEFINE_string('log_path', None, '')
 
     tf.app.run()

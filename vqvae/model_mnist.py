@@ -13,8 +13,12 @@ def quantize_vectors(tensors, embedding_space):
 
     shape_h, shape_w, shape_c = shape_in[1], shape_in[2], shape_in[3]
 
+    # NOTE: transpose so that wxh reside in the last dimension
+    #       wxh is the latent vectors we want to qunatize
+    tensors = tf.transpose(tensors, [0, 3, 1, 2])
+
     # NOTE: flatten to h * w vectors for quantization
-    tensors = tf.reshape(tensors, [-1, shape_h * shape_w, 1, shape_c])
+    tensors = tf.reshape(tensors, [-1, shape_c, 1, shape_h * shape_w])
 
     # NOTE: embedding_space is k * c
     shape_embedding = tf.shape(embedding_space)
@@ -35,6 +39,9 @@ def quantize_vectors(tensors, embedding_space):
 
     # NOTE: do quantization
     quantized = tf.gather(embedding_space, nearest_indices, axis=0)
+
+    # NOTE: transpose back, so the channel go back to the last dimension
+    quantized = tf.transpose(quantized, [0, 2, 1])
 
     # NOTE: reshape back to the original shape
     tensors = tf.reshape(quantized, shape_in)
@@ -60,7 +67,7 @@ def build_encoder(tensors):
 
     tensors = tf.layers.conv2d(
         tensors,
-        filters=16,
+        filters=32,
         kernel_size=1,
         strides=1,
         padding='same',
@@ -110,7 +117,7 @@ def build_model():
         'embedding_space',
         [64, 16],
         trainable=True,
-        initializer=tf.truncated_normal_initializer(stddev=0.02),
+        initializer=tf.truncated_normal_initializer(stddev=0.2),
         dtype=tf.float32)
 
     # NOTE:

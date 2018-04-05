@@ -93,7 +93,7 @@ def train(model, train_batches, valid_batches, ckpt_path, log_path):
         for images in train_batches:
             feeds = {
                 model['source_images']: images,
-                model['learning_rate']: 1e-5,
+                model['learning_rate']: 5e-6,
             }
 
             fetch = {

@@ -4,6 +4,8 @@ import numpy as np
 import os
 import tensorflow as tf
 
+import model_vqvae
+
 
 def mnist_batches(images, batch_size):
     """
@@ -123,9 +125,7 @@ def main(_):
     FLAGS = tf.app.flags.FLAGS
 
     if FLAGS.dataset == 'mnist':
-        import model_mnist
-
-        model = model_mnist.build_model()
+        model = model_vqvae.build_model()
 
         train_image_batches, valid_image_batches = load_mnist(
             FLAGS.data_path)

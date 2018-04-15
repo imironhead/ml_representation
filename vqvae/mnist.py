@@ -64,20 +64,20 @@ def load_mnist(
     train_eigens, train_labels_onehot = None, None
     issue_eigens, issue_labels_onehot = None, None
 
-    if os.path.isfile(path_train_eigens):
+    if path_train_eigens is not None and os.path.isfile(path_train_eigens):
         train_eigens = extract_images(path_train_eigens)
         train_eigens = train_eigens.astype(np.float32) / 255.0
 
-    if os.path.isfile(path_train_labels):
+    if path_train_labels is not None and os.path.isfile(path_train_labels):
         train_labels = extract_labels(path_train_labels)
         train_labels_onehot = np.zeros((train_labels.size, 10))
         train_labels_onehot[np.arange(train_labels.size), train_labels] = 1.0
 
-    if os.path.isfile(path_issue_eigens):
+    if path_issue_eigens is not None and os.path.isfile(path_issue_eigens):
         issue_eigens = extract_images(path_issue_eigens)
         issue_eigens = issue_eigens.astype(np.float32) / 255.0
 
-    if os.path.isfile(path_issue_labels):
+    if path_issue_labels is not None and os.path.isfile(path_issue_labels):
         issue_labels = extract_labels(path_issue_labels)
         issue_labels_onehot = np.zeros((issue_labels.size, 10))
         issue_labels_onehot[np.arange(issue_labels.size), issue_labels] = 1.0

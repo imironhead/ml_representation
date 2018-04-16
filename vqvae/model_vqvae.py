@@ -45,7 +45,37 @@ def quantize_vectors(tensors, embedding_space):
     return tensors
 
 
-def build_encoder(tensors, embedding_d):
+def resnet(tensors, num_filters):
+    """
+    """
+    initializer = tf.truncated_normal_initializer(stddev=0.02)
+
+    x_tensors = tf.layers.conv2d(
+        tensors,
+        filters=num_filters,
+        kernel_size=3,
+        strides=1,
+        padding='same',
+        activation=tf.nn.leaky_relu,
+        kernel_initializer=initializer)
+
+    x_tensors = tf.layers.conv2d(
+        x_tensors,
+        filters=num_filters,
+        kernel_size=1,
+        strides=1,
+        padding='same',
+        activation=None,
+        kernel_initializer=initializer)
+
+    tensors = tensors + x_tensors
+
+    tensors = tf.nn.leaky_relu(tensors)
+
+    return tensors
+
+
+def build_encoder(tensors, use_resnet, embedding_d):
     """
     """
     initializer = tf.truncated_normal_initializer(stddev=0.02)
@@ -66,26 +96,35 @@ def build_encoder(tensors, embedding_d):
 
         tensors = tf.nn.leaky_relu(tensors)
 
-        tensors = tf.layers.conv2d(
-            tensors,
-            filters=filters,
-            kernel_size=3,
-            strides=1,
-            padding='same',
-            activation=None,
-            kernel_initializer=initializer)
+        if not use_resnet:
+            tensors = tf.layers.conv2d(
+                tensors,
+                filters=filters,
+                kernel_size=3,
+                strides=1,
+                padding='same',
+                activation=None,
+                kernel_initializer=initializer)
 
-        tensors = tf.contrib.layers.instance_norm(tensors)
+            tensors = tf.contrib.layers.instance_norm(tensors)
 
-        tensors = tf.nn.leaky_relu(tensors)
+            tensors = tf.nn.leaky_relu(tensors)
+
+    if use_resnet:
+        for _ in range(2):
+            tensors = resnet(tensors, embedding_d)
 
     return tensors
 
 
-def build_decoder(tensors, embedding_d, num_channels):
+def build_decoder(tensors, use_resnet, embedding_d, num_channels):
     """
     """
     initializer = tf.truncated_normal_initializer(stddev=0.02)
+
+    if use_resnet:
+        for _ in range(2):
+            tensors = resnet(tensors, embedding_d)
 
     for layer in range(3):
         filters = embedding_d // (2 ** layer)
@@ -99,14 +138,15 @@ def build_decoder(tensors, embedding_d, num_channels):
             activation=tf.nn.relu,
             kernel_initializer=initializer)
 
-        tensors = tf.layers.conv2d(
-            tensors,
-            filters=filters,
-            kernel_size=3,
-            strides=1,
-            padding='same',
-            activation=tf.nn.relu,
-            kernel_initializer=initializer)
+        if not use_resnet:
+            tensors = tf.layers.conv2d(
+                tensors,
+                filters=filters,
+                kernel_size=3,
+                strides=1,
+                padding='same',
+                activation=tf.nn.relu,
+                kernel_initializer=initializer)
 
     # NOTE: to match the number of channels to the target tensors
     tensors = tf.layers.conv2d(
@@ -121,7 +161,8 @@ def build_decoder(tensors, embedding_d, num_channels):
     return tensors
 
 
-def build_model(source_images, num_channels, embedding_k, embedding_d):
+def build_model(
+        use_resnet, source_images, num_channels, embedding_k, embedding_d):
     """
     source_images: placeholder or tensors
     """
@@ -134,7 +175,7 @@ def build_model(source_images, num_channels, embedding_k, embedding_d):
         dtype=tf.float32)
 
     # NOTE:
-    tensors_ze = build_encoder(source_images, embedding_d)
+    tensors_ze = build_encoder(source_images, use_resnet, embedding_d)
 
     # NOTE: vector quantisation
     tensors_zq = quantize_vectors(tensors_ze, embedding_space)
@@ -149,7 +190,8 @@ def build_model(source_images, num_channels, embedding_k, embedding_d):
     tensors = tf.stop_gradient(tensors_zq - tensors_ze) + tensors_ze
 
     # NOTE:
-    result_images = build_decoder(tensors, embedding_d, num_channels)
+    result_images = build_decoder(
+        tensors, use_resnet, embedding_d, num_channels)
     result_images = tf.identity(result_images, name='result_images')
 
     # NOTE: reconstruction loss

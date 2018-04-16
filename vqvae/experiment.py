@@ -9,6 +9,7 @@ import model_vqvae
 
 
 def build_model(
+        use_resnet,
         num_channels,
         embedding_k,
         embedding_d,
@@ -27,7 +28,7 @@ def build_model(
 
     # NOTE: build the vqvae model with next_batch from tf.data.Dataset as input
     model = model_vqvae.build_model(
-        next_batch, num_channels, embedding_k, embedding_d)
+        use_resnet, next_batch, num_channels, embedding_k, embedding_d)
 
     # NOTE: we need dataset_handle to switch training and validation
     #       let's say it's part of the model
@@ -162,6 +163,7 @@ def main(_):
     valid_batches = build_batch_iterator(FLAGS.valid_data_path, batch_size)
 
     model = build_model(
+        FLAGS.use_resnet,
         num_channels,
         embedding_k,
         embedding_d,
@@ -196,6 +198,8 @@ if __name__ == '__main__':
     tf.app.flags.DEFINE_string('log_path', None, '')
 
     tf.app.flags.DEFINE_string('dataset', 'mnist', '')
+
+    tf.app.flags.DEFINE_boolean('use_resnet', True, '')
 
     tf.app.run()
 

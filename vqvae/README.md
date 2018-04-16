@@ -13,6 +13,17 @@ Training results in step 430,000 (MSCOCO).
 ![test](/assets/vqvae_mscoco_nores_test_400k.png)
 Validation results in step 400,000 (IMAGENET).
 
+### MSCOCO with ResNet
+
+![loss](/assets/vqvae_mscoco_res_loss.png)
+Training Loss.
+
+![train](/assets/vqvae_mscoco_res_train_405k.png)
+Training results in step 405,000 (MSCOCO).
+
+![test](/assets/vqvae_mscoco_res_test_400k.png)
+Validation results in step 400,000 (IMAGENET).
+
 ### MNIST
 
 ### Fashion MNIST

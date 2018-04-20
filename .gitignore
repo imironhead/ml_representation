@@ -102,3 +102,7 @@ ENV/
 
 # vim
 *.swp
+
+# projects
+*/ckpt/
+

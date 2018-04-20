@@ -80,39 +80,24 @@ def build_encoder(tensors, use_resnet, embedding_d):
     """
     initializer = tf.truncated_normal_initializer(stddev=0.02)
 
-    for layer in range(3):
-        filters = embedding_d // (2 ** (2 - layer))
+    for layer in range(2):
+        filters = embedding_d // (2 ** (1 - layer))
 
         tensors = tf.layers.conv2d(
             tensors,
             filters=filters,
             kernel_size=3,
-            strides=1 if layer == 0 else 2,
+            strides=2,
             padding='same',
             activation=None,
             kernel_initializer=initializer)
 
+        tensors = tf.nn.leaky_relu(tensors)
         tensors = tf.contrib.layers.instance_norm(tensors)
 
-        tensors = tf.nn.leaky_relu(tensors)
 
-        if not use_resnet:
-            tensors = tf.layers.conv2d(
-                tensors,
-                filters=filters,
-                kernel_size=3,
-                strides=1,
-                padding='same',
-                activation=None,
-                kernel_initializer=initializer)
-
-            tensors = tf.contrib.layers.instance_norm(tensors)
-
-            tensors = tf.nn.leaky_relu(tensors)
-
-    if use_resnet:
-        for _ in range(2):
-            tensors = resnet(tensors, embedding_d)
+    tensors = resnet(tensors, embedding_d)
+    tensors = resnet(tensors, embedding_d)
 
     return tensors
 
@@ -122,31 +107,20 @@ def build_decoder(tensors, use_resnet, embedding_d, num_channels):
     """
     initializer = tf.truncated_normal_initializer(stddev=0.02)
 
-    if use_resnet:
-        for _ in range(2):
-            tensors = resnet(tensors, embedding_d)
+    tensors = resnet(tensors, embedding_d)
+    tensors = resnet(tensors, embedding_d)
 
-    for layer in range(3):
+    for layer in range(2):
         filters = embedding_d // (2 ** layer)
 
         tensors = tf.layers.conv2d_transpose(
             tensors,
             filters=filters,
             kernel_size=3,
-            strides=1 if layer == 0 else 2,
+            strides=2,
             padding='same',
             activation=tf.nn.relu,
             kernel_initializer=initializer)
-
-        if not use_resnet:
-            tensors = tf.layers.conv2d(
-                tensors,
-                filters=filters,
-                kernel_size=3,
-                strides=1,
-                padding='same',
-                activation=tf.nn.relu,
-                kernel_initializer=initializer)
 
     # NOTE: to match the number of channels to the target tensors
     tensors = tf.layers.conv2d(

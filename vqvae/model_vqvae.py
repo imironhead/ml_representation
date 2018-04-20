@@ -1,5 +1,7 @@
 """
-build a vqvae model for the experiment on MNIST
+build model base on the paper:
+    arXiv:1711.00937v1
+    Neural Discrete Representation Learning
 """
 import tensorflow as tf
 
@@ -13,12 +15,9 @@ def quantize_vectors(tensors, embedding_space):
 
     shape_h, shape_w, shape_c = shape_in[1], shape_in[2], shape_in[3]
 
-    # NOTE: transpose so that wxh reside in the last dimension
-    #       wxh is the latent vectors we want to qunatize
-    tensors = tf.transpose(tensors, [0, 3, 1, 2])
-
     # NOTE: flatten to h * w vectors for quantization
-    tensors = tf.reshape(tensors, [-1, shape_c, 1, shape_h * shape_w])
+    # NOTE: shape_c is also the D on the paper
+    tensors = tf.reshape(tensors, [-1, shape_h * shape_w, 1, shape_c])
 
     # NOTE: embedding_space is k * c
     shape_embedding = tf.shape(embedding_space)
@@ -40,50 +39,80 @@ def quantize_vectors(tensors, embedding_space):
     # NOTE: do quantization
     quantized = tf.gather(embedding_space, nearest_indices, axis=0)
 
-    # NOTE: transpose back, so the channel go back to the last dimension
-    quantized = tf.transpose(quantized, [0, 2, 1])
-
     # NOTE: reshape back to the original shape
     tensors = tf.reshape(quantized, shape_in)
 
     return tensors
 
 
-def build_encoder(tensors):
+def resnet(tensors, num_filters):
     """
-    encode thw MNIST image from 32x32x1 to 4x4x16 tensors
     """
     initializer = tf.truncated_normal_initializer(stddev=0.02)
 
-    for filters in [4, 8, 16]:
+    x_tensors = tf.layers.conv2d(
+        tensors,
+        filters=num_filters,
+        kernel_size=3,
+        strides=1,
+        padding='same',
+        activation=tf.nn.leaky_relu,
+        kernel_initializer=initializer)
+
+    x_tensors = tf.layers.conv2d(
+        x_tensors,
+        filters=num_filters,
+        kernel_size=1,
+        strides=1,
+        padding='same',
+        activation=None,
+        kernel_initializer=initializer)
+
+    tensors = tensors + x_tensors
+
+    tensors = tf.nn.leaky_relu(tensors)
+
+    return tensors
+
+
+def build_encoder(tensors, use_resnet, embedding_d):
+    """
+    """
+    initializer = tf.truncated_normal_initializer(stddev=0.02)
+
+    for layer in range(2):
+        filters = embedding_d // (2 ** (1 - layer))
+
         tensors = tf.layers.conv2d(
             tensors,
             filters=filters,
             kernel_size=3,
             strides=2,
             padding='same',
-            activation=tf.nn.relu,
+            activation=None,
             kernel_initializer=initializer)
 
-    tensors = tf.layers.conv2d(
-        tensors,
-        filters=32,
-        kernel_size=1,
-        strides=1,
-        padding='same',
-        activation=tf.nn.sigmoid,
-        kernel_initializer=initializer)
+        tensors = tf.nn.leaky_relu(tensors)
+        tensors = tf.contrib.layers.instance_norm(tensors)
+
+
+    tensors = resnet(tensors, embedding_d)
+    tensors = resnet(tensors, embedding_d)
 
     return tensors
 
 
-def build_decoder(tensors):
+def build_decoder(tensors, use_resnet, embedding_d, num_channels):
     """
-    decode 4x4xx16 tensors to 32x32x1 image (reconstructed versions of MNIST)
     """
     initializer = tf.truncated_normal_initializer(stddev=0.02)
 
-    for filters in [8, 4, 1]:
+    tensors = resnet(tensors, embedding_d)
+    tensors = resnet(tensors, embedding_d)
+
+    for layer in range(2):
+        filters = embedding_d // (2 ** layer)
+
         tensors = tf.layers.conv2d_transpose(
             tensors,
             filters=filters,
@@ -93,35 +122,34 @@ def build_decoder(tensors):
             activation=tf.nn.relu,
             kernel_initializer=initializer)
 
+    # NOTE: to match the number of channels to the target tensors
     tensors = tf.layers.conv2d(
         tensors,
-        filters=1,
-        kernel_size=3,
+        filters=num_channels,
+        kernel_size=1,
         strides=1,
         padding='same',
-        activation=tf.nn.sigmoid,
+        activation=tf.nn.tanh,
         kernel_initializer=initializer)
 
     return tensors
 
 
-def build_model():
+def build_model(
+        use_resnet, source_images, num_channels, embedding_k, embedding_d):
     """
+    source_images: placeholder or tensors
     """
-    # NOTE: padded to 32x32 instead of 28x28
-    source_images = tf.placeholder(
-        shape=[None, 32, 32, 1], dtype=tf.float32, name='source_images')
-
-    # NOTE: embedding space variables, k=64 and depth is 16
+    # NOTE: embedding space variables
     embedding_space = tf.get_variable(
         'embedding_space',
-        [64, 16],
+        [embedding_k, embedding_d],
         trainable=True,
         initializer=tf.truncated_normal_initializer(stddev=0.2),
         dtype=tf.float32)
 
     # NOTE:
-    tensors_ze = build_encoder(source_images)
+    tensors_ze = build_encoder(source_images, use_resnet, embedding_d)
 
     # NOTE: vector quantisation
     tensors_zq = quantize_vectors(tensors_ze, embedding_space)
@@ -136,11 +164,13 @@ def build_model():
     tensors = tf.stop_gradient(tensors_zq - tensors_ze) + tensors_ze
 
     # NOTE:
-    result_images = build_decoder(tensors)
+    result_images = build_decoder(
+        tensors, use_resnet, embedding_d, num_channels)
     result_images = tf.identity(result_images, name='result_images')
 
     # NOTE: reconstruction loss
-    loss_reconstruction = tf.losses.log_loss(source_images, result_images)
+    loss_reconstruction = \
+        tf.losses.mean_squared_error(source_images, result_images)
 
     # NOTE: vector quantisation loss
     loss_quantization = tf.losses.mean_squared_error(
